@@ -136,7 +136,7 @@ of this table — **keep them in sync; this table is the source of truth.**
 
 | Open item | Decision | Why |
 |-----------|----------|-----|
-| Language & framework (L67) | **Python + FastAPI** | pypdf fills the provided 2025 1040 cleanly (verified, 229 fields); OpenAI-compatible SDK pointed at OpenRouter for PDF/vision; minimal Render surface. |
+| Language & framework (L67) | **Python + FastAPI** | pypdf fills the provided 2025 1040 cleanly (verified, 229 fields); minimal Render surface. |
 | LLM / model (L68) | **None required for the submitted path**; OpenRouter remains optional fallback plumbing | The brief explicitly allows no LLM if justified. Deterministic extraction is faster, reproducible, and avoids API-key failure in the live demo. |
 | Obtain & fill the 1040 (L69) | Provided fillable `assets/f1040.pdf` → **pypdf** AcroForm write → stream bytes | No sourcing; deterministic; verified fillable. |
 | W-2 source & read (L70) | User **uploads**; PDF text extraction → schema-validated `W2` object (`extract_w2`) | Works end-to-end with the supplied realistic W-2 and keeps the agent harness focused on tool orchestration, guardrails, and observation. |
@@ -151,7 +151,7 @@ of this table — **keep them in sync; this table is the source of truth.**
 
 | Fact | Value | Why it matters |
 |------|-------|----------------|
-| Provided 1040 | `docs/f1040.pdf` **is the official 2025 Form 1040** (title "2025 Form 1040"), **fully fillable, 229 AcroForm fields** (`…f1_NN[0]` text, `c1_N[0]` checkboxes). | Fill the form we have — no sourcing. |
+| Provided 1040 | `assets/f1040.pdf` **is the official 2025 Form 1040** (title "2025 Form 1040"), **fully fillable, 229 AcroForm fields** (`…f1_NN[0]` text, `c1_N[0]` checkboxes). | Fill the form we have — no sourcing. |
 | **2025 standard deduction** | **Single $15,750 · MFJ $31,500 · HoH $23,625 · MFS $15,750** — OBBBA-adjusted (Jul 2025). | ⚠️ **#1 accuracy trap.** NOT the $15,000/$30,000 originally in Rev. Proc. 2024-40. |
 | 2025 brackets (single) | 10% ≤ $11,925 · 12% ≤ $48,475 · 22% ≤ $103,350 · 24% ≤ $197,300 · … | Feed the Tax Table; unchanged by OBBBA. |
 | Tax Table rule | Taxable income **< $100,000 ⇒ IRS Tax Table required** ($50-range midpoint, whole-dollar, half-up). | Our profile must use the table, not raw bracket math. |
@@ -235,11 +235,7 @@ agent-tax/
 ├── requirements.txt               # pinned deps
 ├── Makefile                       # make run | make test | make fixtures
 ├── render.yaml                    # deploy SSOT (F9, V2)
-├── .env.example                   # OPENROUTER_API_KEY (never commit secrets)
-├── config/
-│   └── tax_year_2025.py           # SSOT: std deductions, brackets, tax-table params
-├── form_map/
-│   └── f1040_2025.py              # SSOT: 1040 line → AcroForm field name
+├── .env.example                   # optional OpenRouter fallback config
 ├── src/agent_tax/
 │   ├── main.py                    # FastAPI app (uvicorn target)
 │   ├── core/                      # deterministic spine — NO LLM
@@ -247,18 +243,19 @@ agent-tax/
 │   │   ├── tax_engine.py          # compute_1040(): deductions, tax, refund/owe (F6, F7)
 │   │   ├── tax_tables.py          # tax_from_table() — reads config
 │   │   └── pdf_filler.py          # fill_1040_pdf(): pypdf AcroForm write (F6)
+│   ├── config/
+│   │   └── tax_year_2025.py       # SSOT: std deductions, brackets, tax-table params
+│   ├── form_map/
+│   │   └── f1040_2025.py          # SSOT: 1040 line → AcroForm field name
 │   ├── agent/                     # the harness
 │   │   ├── loop.py                # chat loop, state machine, ≤5 counter (P1, F4)
 │   │   ├── tools.py               # tool registry (P2)
-│   │   ├── extractor.py           # extract_w2(): Claude vision → W2 (F3)
-│   │   ├── guardrails.py          # validation, plausibility, scope refusals (P3, S2, S3)
-│   │   └── prompts.py             # system prompt + conversation guidance (F5)
+│   │   ├── extractor.py           # extract_w2(): PDF text → W2 (F3)
+│   │   └── guardrails.py          # validation, plausibility, scope refusals (P3, S2, S3)
 │   ├── obs/
 │   │   └── trace.py               # structured observation (P4)
 │   └── web/
-│       ├── routes.py              # /chat /upload /download /trace (F1, F8)
-│       ├── session.py             # in-memory session store (P1, F1)
-│       └── static/                # minimal chat UI + trace panel (F1, T3)
+│       └── session.py             # in-memory session store (P1, F1)
 ├── scripts/
 │   └── generate_sample_w2.py      # stamps values onto genuine IRS Copy B ✅
 ├── docs/                          # SPECS, brief, DECISIONS, fixtures
@@ -275,7 +272,7 @@ The **Owner** column in §1.7 maps each REQ-ID to a module here — requirement 
 |------|------|----------------------|
 | **0–10** | Scaffold + `config/` + `form_map/` discovery + `core/tax_engine` (pure fn) | Deterministic core is highest-risk-to-"it works" — and needs **no** LLM. |
 | **10–25** | `core/pdf_filler` + **golden test green** | Provably-correct filler exists before any agent. **Hard floor of the demo.** |
-| **25–40** | `agent/` loop + tools + W-2 vision extraction | The harness/pillars, orchestrating the tested core. |
+| **25–40** | `agent/` loop + tools + W-2 extraction | The harness/pillars, orchestrating the tested core. |
 | **40–50** | `web/` chat UI + upload + `/download` + session | Usable end-to-end. |
 | **50–60** | **Deploy to Render** + live smoke test with the sample W-2 | Live URL is a hard deliverable; leave slack for cold-start/env. |
 | *If time* | Trace UI panel (T3) · MFJ (T1) · correction (T2) · messy-W-2 recovery (T4) | Stretch — only after the core is solid. |
@@ -290,7 +287,7 @@ model, so "does it actually work" is guaranteed independent of LLM variance; the
 - **AcroForm field-name discovery** — fiddly; persist to `form_map/`.
 - **Render cold start + ephemeral FS** — stream PDF from memory; expect a slow first request.
 - **API-key secrecy** — env var only; never in the repo.
-- **Vision extraction reliability** — handle rotated/blurry/partial; validate + re-ask.
+- **W-2 extraction reliability** — text PDFs are supported; scanned/blurry PDFs should fail clearly or use a future vision fallback.
 - **5-question budget vs. data needed** — defaults so the cap is never the blocker.
 - **Download headers** — `Content-Type: application/pdf` + `Content-Disposition`.
 - **Not-tax-advice framing** — visible disclaimer; refuse advice gracefully.
@@ -312,9 +309,9 @@ by **adding a module** (Open/Closed), not rewriting.
 
 Labeled so it's clear what ships, what's a fixture, and what to delete.
 
-- **REAL (ships, read at runtime):** `docs/f1040.pdf` — official 2025 1040 we fill (→ `assets/` at scaffold); all `src/`, `config/`, `form_map/` (to write).
-- **REFERENCE (permanent, not shipped, not read at runtime):** `docs/w2_blank_2025.pdf` — genuine IRS 2025 W-2; the template the sample is stamped onto + source of the field map. Plus the brief, `SPECS.md`, `DECISIONS.md`.
-- **TEST/DEMO FIXTURE (only tests + manual upload; never imported by app code):** `docs/w2_filled_sample_2025.pdf` — the fake W-2 a tester/judge uploads, and the extraction/e2e input (→ `tests/fixtures/` at scaffold). `scripts/generate_sample_w2.py` — dev tool that regenerates it by stamping values onto the genuine Copy B; not shipped (needs `reportlab` + `pypdf`).
+- **REAL (ships, read at runtime):** `assets/f1040.pdf` — official 2025 1040 we fill; all `src/` code.
+- **REFERENCE (permanent, not read at runtime):** `assets/w2_blank_2025.pdf` — genuine IRS 2025 W-2; the template the sample is stamped onto + source of the field map. Plus the brief, `SPECS.md`, `DECISIONS.md`.
+- **TEST/DEMO FIXTURE (tests + manual upload):** `assets/w2_filled_sample_2025.pdf` — the fake W-2 a tester/judge uploads, and the extraction/e2e input. `scripts/generate_sample_w2.py` — dev tool that regenerates it by stamping values onto the genuine Copy B; not shipped (needs `reportlab` + `pypdf`).
 - **THROWAWAY (delete when done):** `/tmp/w2gen` (venv) and `/tmp/*.png|pdf` (render checks) — outside the repo.
 - **DELETED:** `docs/w2_filled_sample_2025.json` — it read like a runtime shortcut. Expected tax values now live in `tests/test_tax_engine.py`; the fixture's data lives in its generator. **No fixture is ever read by the app at runtime — it extracts from the uploaded W-2 and computes from tax law.**
 
