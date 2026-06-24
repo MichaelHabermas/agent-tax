@@ -129,7 +129,7 @@ def index() -> str:
   <section class="top">
     <div>
       <h1>Agentic Tax-Filing Assistant</h1>
-      <p class="muted">Upload a fake/test W-2, answer four questions, download a completed 2025 Form 1040. Not tax advice.</p>
+      <p class="muted">Upload a W-2 PDF, answer four questions, download a completed 2025 Form 1040. Not tax advice.</p>
     </div>
     <a id="download" class="download" style="display:none">Download 1040</a>
   </section>
