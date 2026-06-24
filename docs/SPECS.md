@@ -122,7 +122,7 @@ prompt" is explicitly weaker than "it's enforced and visible." *(Brief L17–29.
 |----|-------------|--------|-------|
 | T1 | 2nd filing status / a dependent handled gracefully | L107 | tax_engine, loop |
 | T2 | Correct an answer mid-conversation | L108 | loop/state |
-| T3 | Observation trail surfaced **in the UI** (not just logs) | L109 | `web/static/` panel |
+| T3 | Observation trail surfaced **in the UI** (not just logs) | L109 | `main.py` trace panel |
 | T4 | Validate W-2 + recover from messy/partial data | L110 | extractor + guardrails |
 
 ---
@@ -313,6 +313,6 @@ Labeled so it's clear what ships, what's a fixture, and what to delete.
 - **REFERENCE (permanent, not read at runtime):** `assets/w2_blank_2025.pdf` — genuine IRS 2025 W-2; the template the sample is stamped onto + source of the field map. Plus the brief, `SPECS.md`, `DECISIONS.md`.
 - **TEST/DEMO FIXTURE (tests + manual upload):** `assets/w2_filled_sample_2025.pdf` — the fake W-2 a tester/judge uploads, and the extraction/e2e input. `scripts/generate_sample_w2.py` — dev tool that regenerates it by stamping values onto the genuine Copy B; not shipped (needs `reportlab` + `pypdf`).
 - **THROWAWAY (delete when done):** `/tmp/w2gen` (venv) and `/tmp/*.png|pdf` (render checks) — outside the repo.
-- **DELETED:** `docs/w2_filled_sample_2025.json` — it read like a runtime shortcut. Expected tax values now live in `tests/test_tax_engine.py`; the fixture's data lives in its generator. **No fixture is ever read by the app at runtime — it extracts from the uploaded W-2 and computes from tax law.**
+- **DELETED:** old sample-W-2 JSON shortcut — it read like a runtime shortcut. Expected tax values now live in `tests/test_tax_engine.py`; the fixture's data lives in its generator. **No fixture is ever read by the app at runtime — it extracts from the uploaded W-2 and computes from tax law.**
 
 **Sample-W-2 fidelity:** stamped onto the genuine IRS Copy B, so it looks exactly like a real form. Its OMB renders as "1545-0029" in non-Adobe viewers — a font quirk in the IRS's *own* file (identical in `w2_blank_2025.pdf` and the live IRS form); the true W-2 OMB is 1545-0008. No form text was altered.

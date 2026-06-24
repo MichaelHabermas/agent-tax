@@ -172,6 +172,8 @@ async function refreshTrace() {
   if (data.session.ready) {
     download.href = `/download/${sessionId}`;
     download.style.display = "inline-block";
+    messageInput.disabled = true;
+    sendButton.disabled = true;
   }
 }
 

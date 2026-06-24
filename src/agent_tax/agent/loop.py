@@ -123,6 +123,6 @@ def finish_return(session: SessionState) -> str:
         result = f"a refund of ${int(lines.l35a_refund):,}"
     else:
         result = f"an amount owed of ${int(lines.l37_amount_owed):,}"
-    reply = f"Done. I prepared the 2025 Form 1040 with {result}. Download it below. This is an educational prototype, not tax advice or an e-filed return."
+    reply = f"Done. I prepared the 2025 Form 1040 with {result}. Use the Download 1040 button. This is an educational prototype, not tax advice or an e-filed return."
     session.messages.append({"role": "assistant", "content": reply})
     return reply
