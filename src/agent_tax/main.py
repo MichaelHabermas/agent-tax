@@ -35,6 +35,11 @@ def healthz() -> JSONResponse:
     )
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon() -> Response:
+    return Response(status_code=204)
+
+
 @app.post("/session")
 def create_session() -> JSONResponse:
     session = store.create()
