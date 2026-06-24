@@ -24,9 +24,10 @@ Works for **any** single W-2 — **nothing is hardcoded to the sample taxpayer**
 with **single-source-of-truth** config: tax constants, the 1040 field map, and the sample fixture
 each live in exactly one place (§A).
 
-**Locked decisions (→ §2):** Python + FastAPI · **OpenRouter (OpenAI-compatible API), model `openai/gpt-5.5`** ·
-W-2 read by **GPT-5.5 vision → schema-validated `W2` object** · 1040 filled with **pypdf** on the provided
-`docs/f1040.pdf` · tax via the **exact IRS Tax Table** · guardrails in **code + schema** · deploy to **Render**.
+**Locked decisions (→ §2):** Python + FastAPI · W-2 read by deterministic PDF text extraction →
+schema-validated `W2` object · 1040 filled with **pypdf** on the provided `assets/f1040.pdf` · tax via
+the **exact IRS Tax Table** · guardrails in **code + schema** · deploy to **Render**. OpenRouter is
+kept as an optional future fallback for messy scans; it is not required for the working prototype.
 
 ---
 
@@ -46,13 +47,13 @@ prompt" is explicitly weaker than "it's enforced and visible." *(Brief L17–29.
 
 ## 1.2 Definition of Done (end-result checklist) — *Brief L32–42*
 
-- [ ] **Web-based chat** a user can interact with.
-- [x] Realistic fake W-2 supplied for testing — `docs/w2_filled_sample_2025.pdf` ✅ (user supplies/uploads at runtime).
-- [ ] Agent asks **no more than 5 questions**.
-- [ ] Conversation feels **warm and human** *(explicitly part of the bar)*.
-- [ ] Agent fills a **2025 IRS Form 1040** from the W-2 + answers.
-- [ ] Completed 1040 is **downloadable as a file**.
-- [ ] **Deployed to a public URL** on Render or comparable free host.
+- [x] **Web-based chat** a user can interact with.
+- [x] Realistic fake W-2 supplied for testing — `assets/w2_filled_sample_2025.pdf` ✅ (user supplies/uploads at runtime).
+- [x] Agent asks **no more than 5 questions** (current happy path asks 4).
+- [x] Conversation feels **warm and human** *(explicitly part of the bar)*.
+- [x] Agent fills a **2025 IRS Form 1040** from the W-2 + answers.
+- [x] Completed 1040 is **downloadable as a file**.
+- [ ] **Deployed to a public URL** on Render or comparable free host. Local app is ready; live deployment requires commit/push/redeploy.
 
 ## 1.3 Fixed constraints (do not change) — *Brief L46–58*
 
@@ -94,14 +95,14 @@ prompt" is explicitly weaker than "it's enforced and visible." *(Brief L17–29.
 ### Functional / Definition-of-Done + Fixed constraints *(L32–58)*
 | ID | Requirement | Source | Owner | Verified by |
 |----|-------------|--------|-------|-------------|
-| F1 | Web-based chat interface | L36, L56 | `web/routes.py`, `web/static/` | open URL, chat works |
-| F2 | Supply realistic fake W-2 (~$40k earner) the user provides | L37, L51 | `docs/w2_filled_sample_2025.pdf` ✅ | fixture exists, vision-readable |
+| F1 | Web-based chat interface | L36, L56 | `main.py` | open URL, chat works |
+| F2 | Supply realistic fake W-2 (~$40k earner) the user provides | L37, L51 | `assets/w2_filled_sample_2025.pdf` ✅ | fixture exists, extractor-readable |
 | F3 | Agent reads/ingests the uploaded W-2 | L70 (impl. of L37/L40) | `agent/extractor.py` | round-trip vs sample W-2 pdf |
 | F4 | **≤5 questions** asked | L38, L53 | `agent/loop.py` counter | unit: counter cannot exceed 5 |
-| F5 | Warm, human conversation (judged) | L39, L54 | `agent/prompts.py` | review + e2e transcript |
+| F5 | Warm, human conversation (judged) | L39, L54 | `agent/loop.py` | review + e2e transcript |
 | F6 | Fill **2025 Form 1040** from W-2 + answers | L40, L50 | `core/pdf_filler.py`, `form_map/` | golden test: fields correct |
 | F7 | Support **filing-status** variation (single/MFJ/HoH…) | L52 | `core/tax_engine.py`, `config/` | unit per status |
-| F8 | **Downloadable** completed form | L41, L55 | `web/routes.py` `/download` | e2e: valid PDF downloads |
+| F8 | **Downloadable** completed form | L41, L55 | `main.py` `/download` | e2e: valid PDF downloads |
 | F9 | **Deployed** to public URL (Render/comparable free) | L42, L57 | `render.yaml` | live URL reachable |
 | F10 | Works **end-to-end** (no happy-path mock) | L58 | full system | e2e happy path |
 
@@ -136,14 +137,14 @@ of this table — **keep them in sync; this table is the source of truth.**
 | Open item | Decision | Why |
 |-----------|----------|-----|
 | Language & framework (L67) | **Python + FastAPI** | pypdf fills the provided 2025 1040 cleanly (verified, 229 fields); OpenAI-compatible SDK pointed at OpenRouter for PDF/vision; minimal Render surface. |
-| LLM / model (L68) | **OpenRouter** (provider/gateway) · model **`openai/gpt-5.5`** | Best overall vision + tool-use model for reading messy W-2s; single OpenAI-compatible endpoint, one key, easy model swap via env. Cost not a constraint for this build. |
-| Obtain & fill the 1040 (L69) | Provided fillable `docs/f1040.pdf` → **pypdf** AcroForm write → flatten → stream bytes | No sourcing; deterministic; verified fillable. |
-| W-2 source & read (L70) | User **uploads**; **GPT-5.5 vision (via OpenRouter) → schema-validated `W2` object** (`extract_w2`) | Most agentic; handles real/messy forms; showcases Tools + Guardrails. |
+| LLM / model (L68) | **None required for the submitted path**; OpenRouter remains optional fallback plumbing | The brief explicitly allows no LLM if justified. Deterministic extraction is faster, reproducible, and avoids API-key failure in the live demo. |
+| Obtain & fill the 1040 (L69) | Provided fillable `assets/f1040.pdf` → **pypdf** AcroForm write → stream bytes | No sourcing; deterministic; verified fillable. |
+| W-2 source & read (L70) | User **uploads**; PDF text extraction → schema-validated `W2` object (`extract_w2`) | Works end-to-end with the supplied realistic W-2 and keeps the agent harness focused on tool orchestration, guardrails, and observation. |
 | Tax computation (L71) | **Exact IRS Tax Table** (<$100k), constants in **year-keyed config**, **half-up** rounding | Matches a real return to the dollar; defensible accuracy. |
 | Guardrail enforcement (L72) | **Code + schema** (Pydantic) + hard counter + scope refusals | "Enforced & visible" beats prompt-only. |
 | Conversation design (L73) | ≤5 Qs; identity/wages come from the W-2 so Qs spend on status / dependent-of-another / other-income / itemize-confirm; warm, one at a time | Stays within budget; human tone. |
 | State & sessions (L74) | **In-memory** session store keyed by id (W-2, answers, counter, lines, PDF) | Simple; sufficient for a prototype. |
-| Hosting (L75) | **Render web service** (`render.yaml` blueprint); `OPENROUTER_API_KEY` as a secret; ephemeral FS (stream PDF) | Free, easy, judge-reachable; needs a running server (LLM calls, sessions, PDF build) so a Static Site is wrong. |
+| Hosting (L75) | **Render web service** (`render.yaml` blueprint); ephemeral FS (stream PDF) | Free, easy, judge-reachable; needs a running server for sessions and PDF build so a Static Site is wrong. |
 | Testing (L76) | **Golden test** + extraction round-trip + e2e happy path | Proves "actually works" independent of LLM variance. |
 
 ## 3. Verified facts (locked — do not regress)
@@ -160,14 +161,14 @@ of this table — **keep them in sync; this table is the source of truth.**
 ## 4. Soft / implied requirements (what the hard reqs force us to build)
 
 ### 4.1 Components
-FastAPI app · in-memory session store · `POST /chat` · `POST /upload` · OpenRouter client (OpenAI-compatible) · agent loop ·
+FastAPI app · in-memory session store · `POST /chat` · `POST /upload` · agent loop ·
 tool registry · **W-2 extractor** · **tax engine** · **1040 filler** · `GET /download/{session}` ·
 `GET /trace/{session}` · minimal HTML/JS front end. (Module homes in §A.)
 
 ### 4.2 Tools (the Tools pillar, concretely)
 | Tool | Signature | Notes |
 |------|-----------|-------|
-| `extract_w2` | `(file_bytes) → W2` | GPT-5.5 vision (via OpenRouter) → fields validated against the `W2` schema. |
+| `extract_w2` | `(file_bytes) → W2` | PDF text extraction → fields validated against the `W2` schema. |
 | `compute_1040` | `(W2, answers) → LineItems` | **Pure, deterministic, zero-LLM.** Wages → AGI → std deduction → tax (table) → withholding → refund/owe, across filing statuses. The heart of "actually works." |
 | `fill_1040_pdf` | `(LineItems) → pdf_bytes` | pypdf writes AcroForm fields via `form_map/`; flatten; return bytes. |
 | helpers | `standard_deduction(status, year)`, `tax_from_table(taxable, status, year)` | read `config/`; no magic numbers. |
@@ -197,19 +198,19 @@ box 3/5 ≈ box 1, SSN/EIN format) · **scope refusals** (no advice; decline >1 
 **hard ≤5 counter in code** · fake-data posture + persistent **"not tax advice"** disclaimer.
 
 ### 4.7 Observation
-Per-turn structured trace: user input → model message → tool calls (name + args) → results → computed
+Per-turn structured trace: user input → assistant message → tool calls (name + args) → results → computed
 lines → decision/next phase. To **logs** + a **`/trace` UI panel** (T3) so a judge sees the reasoning.
 
 ### 4.8 State & sessions
 Session id; in-memory state = W-2 + answers + question count + computed lines + generated PDF; reset/new-session.
 
 ### 4.9 Deployment
-Render web service (`render.yaml` blueprint) · `OPENROUTER_API_KEY` secret · `uvicorn … --port $PORT` · **ephemeral FS** (build
+Render web service (`render.yaml` blueprint) · `uvicorn … --port $PORT` · **ephemeral FS** (build
 PDF in memory, stream it) · pinned `requirements.txt` · one-command local run (`make run`).
 
 ### 4.10 Testing / proof
 - **Golden (no LLM):** `compute_1040(W2(wages=48000, withholding=4250), single)` → Line 15 = 32,250, Line 16 = 3,635, refund = 615. Input **and** expected lines are written in the test (hand-verified) — it proves correctness, not self-consistency.
-- **Extraction round-trip:** `extract_w2(docs/w2_filled_sample_2025.pdf)` → the box values the test asserts (48000, 4250, …).
+- **Extraction round-trip:** `extract_w2(assets/w2_filled_sample_2025.pdf)` → the box values the test asserts (48000, 4250, …).
 - **E2E happy path:** upload → ≤5 answers → correctly-filled, downloadable 1040.
 
 ---

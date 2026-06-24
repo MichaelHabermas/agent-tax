@@ -43,7 +43,8 @@ def start_after_upload(session: SessionState, file_bytes: bytes) -> str:
         raise ValueError("I could read the W-2, but it failed validation: " + "; ".join(issues))
 
     session.w2 = w2
-    session.messages.append({"role": "assistant", "content": "Got the W-2. I’ll keep this to four quick questions."})
+    intro = "Got the W-2. I’ll keep this to four quick questions."
+    session.messages.append({"role": "assistant", "content": intro})
     session.trace.add(
         "tool_result",
         tool="extract_w2",
@@ -51,7 +52,7 @@ def start_after_upload(session: SessionState, file_bytes: bytes) -> str:
         wages=str(w2.box1_wages),
         withholding=str(w2.box2_fed_withholding),
     )
-    return _ask(session, "filing_status")
+    return f"{intro}\n\n{_ask(session, 'filing_status')}"
 
 
 def handle_user_message(session: SessionState, message: str) -> str:
