@@ -16,12 +16,28 @@ from agent_tax.web.session import SessionState
 QUESTION_BY_PHASE = {
     "filing_status": (
         "I read the W-2. What filing status should I use: single, married filing jointly, "
-        "married filing separately, head of household, or qualifying surviving spouse?"
+        "married filing separately, head of household, or qualifying surviving spouse? "
+        "You can also type 'use defaults' to prepare a simple single-W-2 return."
     ),
     "dependent": "Can someone else claim this taxpayer as a dependent for 2025?",
     "other_income": "Besides this one W-2, did the taxpayer have any other income in 2025?",
     "standard_deduction": "Last check: should I use the standard deduction for this simple return?",
 }
+
+
+def _wants_defaults(message: str) -> bool:
+    normalized = message.strip().lower()
+    return any(
+        phrase in normalized
+        for phrase in (
+            "use defaults",
+            "default",
+            "give me the thing",
+            "give me the form",
+            "just do it",
+            "prepare it",
+        )
+    )
 
 
 def _ask(session: SessionState, phase: str) -> str:
@@ -63,9 +79,20 @@ def handle_user_message(session: SessionState, message: str) -> str:
         return "Please upload the W-2 PDF first. Then I’ll ask the few questions I need."
 
     if session.phase == "filing_status":
+        if _wants_defaults(message):
+            session.answers.update(
+                {
+                    "filing_status": "single",
+                    "can_be_claimed_as_dependent": False,
+                    "other_income_acknowledged": True,
+                    "take_standard_deduction": True,
+                }
+            )
+            session.trace.add("defaults_applied", reason=message)
+            return finish_return(session)
         status = parse_filing_status(message)
         if not status:
-            return "Use one of: single, married filing jointly, married filing separately, head of household, or qualifying surviving spouse."
+            return "Use one of: single, married filing jointly, married filing separately, head of household, qualifying surviving spouse, or type 'use defaults'."
         session.answers["filing_status"] = status
         session.trace.add("answer_recorded", field="filing_status", value=status)
         return _ask(session, "dependent")

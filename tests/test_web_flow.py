@@ -54,3 +54,18 @@ def test_other_income_guardrail_blocks_return():
     assert blocked.json()["session"]["phase"] == "blocked"
     assert "should not silently prepare an incomplete return" in blocked.json()["message"]
     assert client.get(f"/download/{session_id}").status_code == 404
+
+
+def test_defaults_phrase_completes_return():
+    client = TestClient(app)
+    with Path("assets/w2_filled_sample_2025.pdf").open("rb") as file:
+        upload = client.post("/upload", files={"file": ("w2.pdf", file, "application/pdf")})
+
+    session_id = upload.json()["session"]["id"]
+    response = client.post("/chat", data={"session_id": session_id, "message": "Give me the thing."})
+
+    assert response.status_code == 200
+    assert response.json()["session"]["phase"] == "complete"
+    assert response.json()["session"]["ready"] is True
+    assert response.json()["session"]["refund"] == "615.00"
+    assert client.get(f"/download/{session_id}").status_code == 200
