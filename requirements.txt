@@ -1,0 +1,20 @@
+# Pinned runtime deps (SPECS §4.9). Floors chosen for known-good APIs; run
+# `pip freeze > requirements.lock.txt` before the demo if you want exact pins.
+
+# Web service
+fastapi>=0.111
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9     # W-2 file upload (POST /upload)
+
+# Contracts / validation (guardrails live in the schema — P3)
+pydantic>=2.7
+
+# LLM: OpenAI-compatible SDK pointed at OpenRouter (GPT-5.5 vision + tools)
+openai>=1.40
+httpx>=0.27
+
+# 1040 PDF fill (pypdf AcroForm write -> flatten -> stream)
+pypdf>=4.2
+
+# Local .env loading (no-op in Render, which injects real env vars)
+python-dotenv>=1.0

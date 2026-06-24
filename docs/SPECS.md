@@ -24,8 +24,8 @@ Works for **any** single W-2 — **nothing is hardcoded to the sample taxpayer**
 with **single-source-of-truth** config: tax constants, the 1040 field map, and the sample fixture
 each live in exactly one place (§A).
 
-**Locked decisions (→ §2):** Python + FastAPI · Claude (Sonnet 4.6 default, Opus 4.8 fallback) ·
-W-2 read by **Claude vision → schema-validated `W2` object** · 1040 filled with **pypdf** on the provided
+**Locked decisions (→ §2):** Python + FastAPI · **OpenRouter (OpenAI-compatible API), model `openai/gpt-5.5`** ·
+W-2 read by **GPT-5.5 vision → schema-validated `W2` object** · 1040 filled with **pypdf** on the provided
 `docs/f1040.pdf` · tax via the **exact IRS Tax Table** · guardrails in **code + schema** · deploy to **Render**.
 
 ---
@@ -135,15 +135,15 @@ of this table — **keep them in sync; this table is the source of truth.**
 
 | Open item | Decision | Why |
 |-----------|----------|-----|
-| Language & framework (L67) | **Python + FastAPI** | pypdf fills the provided 2025 1040 cleanly (verified, 229 fields); Anthropic SDK native PDF/vision; minimal Render surface. |
-| LLM / model (L68) | **Claude Sonnet 4.6** default, **Opus 4.8** fallback | Strong vision + tool use at low latency/cost; Opus for the hardest reasoning. |
+| Language & framework (L67) | **Python + FastAPI** | pypdf fills the provided 2025 1040 cleanly (verified, 229 fields); OpenAI-compatible SDK pointed at OpenRouter for PDF/vision; minimal Render surface. |
+| LLM / model (L68) | **OpenRouter** (provider/gateway) · model **`openai/gpt-5.5`** | Best overall vision + tool-use model for reading messy W-2s; single OpenAI-compatible endpoint, one key, easy model swap via env. Cost not a constraint for this build. |
 | Obtain & fill the 1040 (L69) | Provided fillable `docs/f1040.pdf` → **pypdf** AcroForm write → flatten → stream bytes | No sourcing; deterministic; verified fillable. |
-| W-2 source & read (L70) | User **uploads**; **Claude vision → schema-validated `W2` object** (`extract_w2`) | Most agentic; handles real/messy forms; showcases Tools + Guardrails. |
+| W-2 source & read (L70) | User **uploads**; **GPT-5.5 vision (via OpenRouter) → schema-validated `W2` object** (`extract_w2`) | Most agentic; handles real/messy forms; showcases Tools + Guardrails. |
 | Tax computation (L71) | **Exact IRS Tax Table** (<$100k), constants in **year-keyed config**, **half-up** rounding | Matches a real return to the dollar; defensible accuracy. |
 | Guardrail enforcement (L72) | **Code + schema** (Pydantic) + hard counter + scope refusals | "Enforced & visible" beats prompt-only. |
 | Conversation design (L73) | ≤5 Qs; identity/wages come from the W-2 so Qs spend on status / dependent-of-another / other-income / itemize-confirm; warm, one at a time | Stays within budget; human tone. |
 | State & sessions (L74) | **In-memory** session store keyed by id (W-2, answers, counter, lines, PDF) | Simple; sufficient for a prototype. |
-| Hosting (L75) | **Render** free web service; API key as secret; ephemeral FS (stream PDF) | Free, easy, judge-reachable. |
+| Hosting (L75) | **Render web service** (`render.yaml` blueprint); `OPENROUTER_API_KEY` as a secret; ephemeral FS (stream PDF) | Free, easy, judge-reachable; needs a running server (LLM calls, sessions, PDF build) so a Static Site is wrong. |
 | Testing (L76) | **Golden test** + extraction round-trip + e2e happy path | Proves "actually works" independent of LLM variance. |
 
 ## 3. Verified facts (locked — do not regress)
@@ -160,14 +160,14 @@ of this table — **keep them in sync; this table is the source of truth.**
 ## 4. Soft / implied requirements (what the hard reqs force us to build)
 
 ### 4.1 Components
-FastAPI app · in-memory session store · `POST /chat` · `POST /upload` · Anthropic client · agent loop ·
+FastAPI app · in-memory session store · `POST /chat` · `POST /upload` · OpenRouter client (OpenAI-compatible) · agent loop ·
 tool registry · **W-2 extractor** · **tax engine** · **1040 filler** · `GET /download/{session}` ·
 `GET /trace/{session}` · minimal HTML/JS front end. (Module homes in §A.)
 
 ### 4.2 Tools (the Tools pillar, concretely)
 | Tool | Signature | Notes |
 |------|-----------|-------|
-| `extract_w2` | `(file_bytes) → W2` | Claude vision → fields validated against the `W2` schema. |
+| `extract_w2` | `(file_bytes) → W2` | GPT-5.5 vision (via OpenRouter) → fields validated against the `W2` schema. |
 | `compute_1040` | `(W2, answers) → LineItems` | **Pure, deterministic, zero-LLM.** Wages → AGI → std deduction → tax (table) → withholding → refund/owe, across filing statuses. The heart of "actually works." |
 | `fill_1040_pdf` | `(LineItems) → pdf_bytes` | pypdf writes AcroForm fields via `form_map/`; flatten; return bytes. |
 | helpers | `standard_deduction(status, year)`, `tax_from_table(taxable, status, year)` | read `config/`; no magic numbers. |
@@ -204,7 +204,7 @@ lines → decision/next phase. To **logs** + a **`/trace` UI panel** (T3) so a j
 Session id; in-memory state = W-2 + answers + question count + computed lines + generated PDF; reset/new-session.
 
 ### 4.9 Deployment
-Render web service · `ANTHROPIC_API_KEY` secret · `uvicorn … --port $PORT` · **ephemeral FS** (build
+Render web service (`render.yaml` blueprint) · `OPENROUTER_API_KEY` secret · `uvicorn … --port $PORT` · **ephemeral FS** (build
 PDF in memory, stream it) · pinned `requirements.txt` · one-command local run (`make run`).
 
 ### 4.10 Testing / proof
@@ -225,7 +225,7 @@ PDF in memory, stream it) · pinned `requirements.txt` · one-command local run 
 - **Tax-year parameterized (Open/Closed).** No literal `2025` in logic; the year selects a config
   module. Adding 2026 = new `config/tax_year_2026.py` + `form_map/f1040_2026.py`, **zero** engine edits.
 - **Deterministic spine isolated from the LLM (Dependency Inversion).** `core/` is pure, importable,
-  unit-tested, with **no** Anthropic dependency. `agent/` orchestrates, depending on tool *interfaces* + `core`.
+  unit-tested, with **no** LLM/OpenRouter dependency. `agent/` orchestrates, depending on tool *interfaces* + `core`.
 - **One responsibility per module (SRP);** thin `core/models.py` schemas are the contracts between layers (ISP).
 
 ```
@@ -234,7 +234,7 @@ agent-tax/
 ├── requirements.txt               # pinned deps
 ├── Makefile                       # make run | make test | make fixtures
 ├── render.yaml                    # deploy SSOT (F9, V2)
-├── .env.example                   # ANTHROPIC_API_KEY (never commit secrets)
+├── .env.example                   # OPENROUTER_API_KEY (never commit secrets)
 ├── config/
 │   └── tax_year_2025.py           # SSOT: std deductions, brackets, tax-table params
 ├── form_map/

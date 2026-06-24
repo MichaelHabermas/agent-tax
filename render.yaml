@@ -1,0 +1,50 @@
+# Render Blueprint — deploy SSOT (SPECS F9, V2)
+# Web service (NOT a static site): a running server is required for LLM calls
+# (OpenRouter / GPT-5.5 vision), in-memory sessions, and in-memory PDF generation.
+#
+# One-time setup:
+#   1. Push this repo to GitHub.
+#   2. Render → New → Blueprint → pick this repo (reads render.yaml).
+#   3. Set the OPENROUTER_API_KEY secret when prompted (sync: false → never stored in git).
+#   4. Deploy. First request after idle is a cold start on the free plan (expected).
+services:
+  - type: web
+    name: agent-tax
+    runtime: python
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    # src/ layout: expose the package via PYTHONPATH (see envVars below).
+    startCommand: uvicorn agent_tax.main:app --host 0.0.0.0 --port $PORT
+    # Root serves the chat UI (F1) and returns 200 — used as the health probe.
+    healthCheckPath: /
+    envVars:
+      # ---- Secret: set in the Render dashboard, never committed ----
+      - key: OPENROUTER_API_KEY
+        sync: false
+
+      # ---- LLM config (swap model/provider here, zero code changes) ----
+      - key: OPENROUTER_BASE_URL
+        value: https://openrouter.ai/api/v1
+      - key: LLM_MODEL
+        value: openai/gpt-5.5
+      - key: LLM_TEMPERATURE
+        value: "0"
+      # Optional OpenRouter attribution (shows up in your OpenRouter dashboard)
+      - key: OPENROUTER_APP_TITLE
+        value: Agentic Tax-Filing Assistant
+
+      # ---- Runtime ----
+      - key: PYTHON_VERSION
+        value: "3.12.5"
+      - key: PYTHONPATH
+        value: src
+
+      # ---- Observability / traceability (SPECS Pillar 4, §4.7) ----
+      # Structured per-turn trace -> stdout (captured by Render logs) and the
+      # /trace/{session} endpoint + UI panel. Toggle/verbosity via these knobs.
+      - key: LOG_LEVEL
+        value: INFO
+      - key: TRACE_ENABLED
+        value: "true"
