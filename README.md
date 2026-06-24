@@ -6,6 +6,12 @@ An agentic tax-filing assistant.
 
 This project is being built for the "Build an Agentic Tax-Filing Assistant" hackathon challenge. See [`docs/`](docs/) for the challenge brief and supporting materials.
 
+## Links
+
+- **Live site (Render):** https://agent-tax.onrender.com  _(pending first deploy — Render assigns `<service-name>.onrender.com`; update here if the name is taken and gets a suffix)_
+- **Repository (origin):** https://labs.gauntletai.com/michaelhabermas/agent-tax
+  - Clone: `git clone https://labs.gauntletai.com/michaelhabermas/agent-tax.git`
+
 ## Stack
 
 - **Backend:** Python + FastAPI (uvicorn).
